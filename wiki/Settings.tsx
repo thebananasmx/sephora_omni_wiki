@@ -1,6 +1,6 @@
-import React, { useContext, useCallback } from 'react';
+import React, { useContext, useCallback, useState, useEffect } from 'react';
 import { SettingsContext } from '../contexts/SettingsContext';
-import { LogoType, ButtonRadiusType, PrimaryButtonStyleType } from '../types';
+import { Settings, LogoType, ButtonRadiusType, PrimaryButtonStyleType } from '../types';
 import { LogoCube, LogoPlus, LogoSwatch, LogoDefault } from '../components/Logo';
 
 const PageHeader: React.FC<{title: string; subtitle: string}> = ({ title, subtitle }) => (
@@ -41,13 +41,31 @@ const primaryButtonStyles: { id: PrimaryButtonStyleType, label: string }[] = [
 
 const Settings: React.FC = () => {
     const { settings, updateSettings } = useContext(SettingsContext);
+    const [localSettings, setLocalSettings] = useState<Settings>(settings);
+    const [hasChanges, setHasChanges] = useState(false);
 
-    const handleUpdate = useCallback((key: keyof typeof settings, value: any) => {
-        updateSettings({ [key]: value });
-    }, [updateSettings]);
+    useEffect(() => {
+        setLocalSettings(settings);
+    }, [settings]);
+
+    useEffect(() => {
+        setHasChanges(JSON.stringify(localSettings) !== JSON.stringify(settings));
+    }, [localSettings, settings]);
+
+    const handleUpdate = useCallback((key: keyof Settings, value: any) => {
+        setLocalSettings(prev => ({ ...prev, [key]: value }));
+    }, []);
+
+    const handleSave = () => {
+        updateSettings(localSettings);
+    };
+
+    const handleCancel = () => {
+        setLocalSettings(settings);
+    };
 
     return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl pb-24">
         <PageHeader 
             title="Settings"
             subtitle="Customize the appearance of your design system wiki."
@@ -63,7 +81,7 @@ const Settings: React.FC = () => {
                 <input 
                     type="text" 
                     id="appName" 
-                    value={settings.appName}
+                    value={localSettings.appName}
                     onChange={(e) => handleUpdate('appName', e.target.value)}
                     className="mt-1 block w-full max-w-sm px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-accent focus:border-accent sm:text-sm"
                 />
@@ -75,7 +93,7 @@ const Settings: React.FC = () => {
                          <button
                             key={id}
                             onClick={() => handleUpdate('logo', id)}
-                            className={`p-3 border-2 rounded-lg ${settings.logo === id ? 'border-accent' : 'border-slate-300 dark:border-slate-700'}`}
+                            className={`p-3 border-2 rounded-lg ${localSettings.logo === id ? 'border-accent' : 'border-slate-300 dark:border-slate-700'}`}
                             aria-label={`Select ${id} logo`}
                          >
                              <Icon className="w-6 h-6 text-slate-600 dark:text-slate-300"/>
@@ -96,7 +114,7 @@ const Settings: React.FC = () => {
                      <input 
                         type="color" 
                         id="primaryColor" 
-                        value={settings.primaryColor}
+                        value={localSettings.primaryColor}
                         onChange={(e) => handleUpdate('primaryColor', e.target.value)}
                         className="p-1 h-10 w-10 block bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 cursor-pointer rounded-md"
                     />
@@ -105,7 +123,7 @@ const Settings: React.FC = () => {
                             <button
                                 key={color}
                                 onClick={() => handleUpdate('primaryColor', color)}
-                                className={`h-8 w-8 rounded-full border-2 ${settings.primaryColor === color ? 'border-slate-800 dark:border-white' : 'border-transparent'}`}
+                                className={`h-8 w-8 rounded-full border-2 ${localSettings.primaryColor === color ? 'border-slate-800 dark:border-white' : 'border-transparent'}`}
                                 style={{ backgroundColor: color }}
                                 aria-label={`Select color ${color}`}
                             />
@@ -121,7 +139,7 @@ const Settings: React.FC = () => {
                         <button
                             key={id}
                             onClick={() => handleUpdate('buttonRadius', id)}
-                            className={`px-4 py-2 text-sm font-semibold border ${settings.buttonRadius === id ? 'bg-accent text-white border-accent' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700'}`}
+                            className={`px-4 py-2 text-sm font-semibold border rounded-md ${localSettings.buttonRadius === id ? 'bg-accent text-white border-accent' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700'}`}
                         >
                             {label}
                         </button>
@@ -136,16 +154,34 @@ const Settings: React.FC = () => {
                         <button
                             key={id}
                             onClick={() => handleUpdate('primaryButtonStyle', id)}
-                             className={`px-4 py-2 text-sm font-semibold border rounded-md ${settings.primaryButtonStyle === id ? 'bg-accent text-white border-accent' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700'}`}
+                             className={`px-4 py-2 text-sm font-semibold border rounded-md ${localSettings.primaryButtonStyle === id ? 'bg-accent text-white border-accent' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700'}`}
                         >
                             {label}
                         </button>
                     ))}
                  </div>
             </div>
-
         </div>
-
+        
+        {/* --- Action Buttons --- */}
+        <div className="fixed bottom-0 left-0 md:left-64 right-0 bg-slate-100/80 dark:bg-slate-900/80 backdrop-blur-sm z-20">
+            <div className="max-w-4xl mx-auto flex justify-end gap-4 px-6 md:px-10 py-4 border-t border-slate-200 dark:border-slate-800">
+                <button
+                    onClick={handleCancel}
+                    disabled={!hasChanges}
+                    className="px-5 py-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:border-slate-700"
+                >
+                    Cancelar
+                </button>
+                <button
+                    onClick={handleSave}
+                    disabled={!hasChanges}
+                    className="px-5 py-2 text-sm font-semibold text-white bg-accent shadow-sm hover:opacity-90 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Aceptar
+                </button>
+            </div>
+        </div>
     </div>
   );
 };
