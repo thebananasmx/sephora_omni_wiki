@@ -1,0 +1,5 @@
+{
+  "name": "Wiki Design System",
+  "description": "A minimalist, responsive wiki page to host a design system's guidelines. Built with React and Tailwind CSS, featuring a sidebar navigation for desktop and a top menu for mobile.",
+  "requestFramePermissions": []
+}
