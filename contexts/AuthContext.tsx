@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext, useMemo } from 'react';
+import React, { createContext, useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
 
@@ -36,7 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = useCallback(async () => {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
@@ -44,42 +44,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("Authentication Error:", error);
       throw error;
     }
-  };
+  }, []);
 
-  const signUpWithEmail = async (email: string, password: string) => {
+  const signUpWithEmail = useCallback(async (email: string, password: string) => {
     try {
       await createUserWithEmailAndPassword(auth, email, password);
     } catch (error) {
        console.error("Sign Up Error:", error);
        throw error;
     }
-  };
+  }, []);
 
-  const signInWithEmail = async (email: string, password: string) => {
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
      try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
        console.error("Sign In Error:", error);
        throw error;
     }
-  };
+  }, []);
 
-  const sendPasswordReset = async (email: string) => {
+  const sendPasswordReset = useCallback(async (email: string) => {
     try {
       await sendPasswordResetEmail(auth, email);
     } catch (error) {
       console.error("Password Reset Error:", error);
       throw error;
     }
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await signOut(auth);
     } catch (error) {
       console.error("Logout Error:", error);
     }
-  };
+  }, []);
 
   const value = useMemo(() => ({
     user,
@@ -89,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUpWithEmail,
     signInWithEmail,
     sendPasswordReset,
-  }), [user, loading]);
+  }), [user, loading, loginWithGoogle, logout, signUpWithEmail, signInWithEmail, sendPasswordReset]);
 
   return (
     <AuthContext.Provider value={value}>

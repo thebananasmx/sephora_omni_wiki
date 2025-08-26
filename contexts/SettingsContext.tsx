@@ -50,52 +50,76 @@ export const SettingsContext = createContext<SettingsContextType>({
   updateSettings: async () => {},
 });
 
+const GLOBAL_SETTINGS_ID = '_global';
+
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [loading, setLoading] = useState(true);
   const { user, loading: authLoading } = useAuth();
+  const userId = user?.uid;
+
+  const sanitizeSettings = (data: any): Settings => {
+    return {
+      appName: data.appName || defaultSettings.appName,
+      logo: data.logo || defaultSettings.logo,
+      primaryColor: data.primaryColor || defaultSettings.primaryColor,
+      buttonRadius: data.buttonRadius || defaultSettings.buttonRadius,
+      primaryButtonStyle: data.primaryButtonStyle || defaultSettings.primaryButtonStyle,
+    };
+  };
 
   // Effect to load settings from Firestore, dependent on auth state
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchUserSettings = async (uid: string) => {
+      setLoading(true);
       try {
-        const settingsDocRef = doc(db, 'settings', 'global');
+        const settingsDocRef = doc(db, 'settings', uid);
         const docSnap = await getDoc(settingsDocRef);
         if (docSnap.exists()) {
-          const data = docSnap.data();
-          // Sanitize the data from Firestore
-          const newSettings: Settings = {
-            appName: data.appName || defaultSettings.appName,
-            logo: data.logo || defaultSettings.logo,
-            primaryColor: data.primaryColor || defaultSettings.primaryColor,
-            buttonRadius: data.buttonRadius || defaultSettings.buttonRadius,
-            primaryButtonStyle: data.primaryButtonStyle || defaultSettings.primaryButtonStyle,
-          };
+          const newSettings = sanitizeSettings(docSnap.data());
           setSettings(newSettings);
         } else {
-          // If no settings exist in Firestore, initialize with defaults
+          // If no settings exist for the user, initialize with defaults
           await setDoc(settingsDocRef, defaultSettings);
           setSettings(defaultSettings);
         }
       } catch (error) {
-        console.error("Error fetching settings:", error);
+        console.error("Error fetching user settings:", error);
         setSettings(defaultSettings); // Fallback to defaults on error
       } finally {
         setLoading(false);
       }
     };
 
+    const fetchGlobalSettings = async () => {
+        setLoading(true);
+        try {
+            const settingsDocRef = doc(db, 'settings', GLOBAL_SETTINGS_ID);
+            const docSnap = await getDoc(settingsDocRef);
+            if (docSnap.exists()) {
+                const newSettings = sanitizeSettings(docSnap.data());
+                setSettings(newSettings);
+            } else {
+                // If no global settings exist, initialize with defaults and use them
+                await setDoc(settingsDocRef, defaultSettings);
+                setSettings(defaultSettings);
+            }
+        } catch (error) {
+            console.error("Error fetching global settings:", error);
+            setSettings(defaultSettings); // Fallback to defaults on error
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (!authLoading) {
-      if (user) {
-        // If user is logged in, fetch their settings
-        fetchSettings();
+      if (userId) {
+        fetchUserSettings(userId);
       } else {
-        // If user is not logged in, no need to fetch. Use defaults.
-        setSettings(defaultSettings);
-        setLoading(false);
+        fetchGlobalSettings();
       }
     }
-  }, [user, authLoading]);
+  }, [userId, authLoading]);
 
 
   // Effect to apply theme CSS variables whenever settings change
@@ -110,16 +134,20 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [settings.primaryColor]);
 
   const updateSettings = useCallback(async (newSettings: Partial<Settings>) => {
+    if (!userId) {
+      console.error("Cannot update settings: no user is logged in.");
+      return;
+    }
     const updatedSettings = { ...settings, ...newSettings };
     setSettings(updatedSettings);
     try {
-      const settingsDocRef = doc(db, 'settings', 'global');
+      const settingsDocRef = doc(db, 'settings', userId);
       await setDoc(settingsDocRef, newSettings, { merge: true });
     } catch (error) {
       console.error("Error updating settings:", error);
       // Optional: handle error, maybe revert optimistic update
     }
-  }, [settings]);
+  }, [settings, userId]);
   
   const value = useMemo(() => ({ settings, loading, updateSettings }), [settings, loading, updateSettings]);
 
