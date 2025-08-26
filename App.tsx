@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
+import LoginPage from './components/LoginPage';
 import { SectionId } from './types';
 import Introduction from './wiki/Introduction';
 import Colors from './wiki/Colors';
@@ -9,10 +10,13 @@ import Components from './wiki/Components';
 import Layout from './wiki/Layout';
 import Icons from './wiki/Icons';
 import Settings from './wiki/Settings';
+import { useAuth } from './contexts/AuthContext';
+import { Logo } from './components/Logo';
 
 const App: React.FC = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionId>(SectionId.INTRODUCTION);
+  const { user, loading } = useAuth();
 
   const handleSectionChange = useCallback((sectionId: SectionId) => {
     setActiveSection(sectionId);
@@ -39,6 +43,20 @@ const App: React.FC = () => {
         return <Introduction />;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-900">
+        <div className="p-4 bg-accent rounded-lg animate-pulse">
+            <Logo type="default" className="w-8 h-8 text-white" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 font-sans">
