@@ -11,12 +11,14 @@ import Layout from './wiki/Layout';
 import Icons from './wiki/Icons';
 import Settings from './wiki/Settings';
 import { useAuth } from './contexts/AuthContext';
+import { useSettings } from './contexts/SettingsContext';
 import { Logo } from './components/Logo';
 
 const App: React.FC = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionId>(SectionId.INTRODUCTION);
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { loading: settingsLoading } = useSettings();
 
   const handleSectionChange = useCallback((sectionId: SectionId) => {
     setActiveSection(sectionId);
@@ -44,7 +46,7 @@ const App: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (authLoading || settingsLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-900">
         <div className="p-4 bg-accent rounded-lg animate-pulse">

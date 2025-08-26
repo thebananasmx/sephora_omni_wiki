@@ -1,5 +1,8 @@
-import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { Settings, LogoType, ButtonRadiusType, PrimaryButtonStyleType } from '../types';
+import React, { createContext, useState, useEffect, useCallback, useMemo, useContext } from 'react';
+import { Settings } from '../types';
+import { db } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { useAuth } from './AuthContext';
 
 // Utility to convert hex to HSL, necessary for dynamic themeing via CSS variables
 const hexToHsl = (hex: string): { h: number; s: number; l: number } | null => {
@@ -27,7 +30,6 @@ const hexToHsl = (hex: string): { h: number; s: number; l: number } | null => {
   return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
 };
 
-
 const defaultSettings: Settings = {
   appName: 'Design Wiki',
   logo: 'default',
@@ -38,26 +40,66 @@ const defaultSettings: Settings = {
 
 interface SettingsContextType {
   settings: Settings;
-  updateSettings: (newSettings: Partial<Settings>) => void;
+  loading: boolean;
+  updateSettings: (newSettings: Partial<Settings>) => Promise<void>;
 }
 
 export const SettingsContext = createContext<SettingsContextType>({
   settings: defaultSettings,
-  updateSettings: () => {},
+  loading: true,
+  updateSettings: async () => {},
 });
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = useState<Settings>(() => {
-    try {
-      const storedSettings = localStorage.getItem('design-wiki-settings');
-      return storedSettings ? JSON.parse(storedSettings) : defaultSettings;
-    } catch (error) {
-      return defaultSettings;
-    }
-  });
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading } = useAuth();
 
+  // Effect to load settings from Firestore, dependent on auth state
   useEffect(() => {
-    // Apply theme color
+    const fetchSettings = async () => {
+      try {
+        const settingsDocRef = doc(db, 'settings', 'global');
+        const docSnap = await getDoc(settingsDocRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          // Sanitize the data from Firestore
+          const newSettings: Settings = {
+            appName: data.appName || defaultSettings.appName,
+            logo: data.logo || defaultSettings.logo,
+            primaryColor: data.primaryColor || defaultSettings.primaryColor,
+            buttonRadius: data.buttonRadius || defaultSettings.buttonRadius,
+            primaryButtonStyle: data.primaryButtonStyle || defaultSettings.primaryButtonStyle,
+          };
+          setSettings(newSettings);
+        } else {
+          // If no settings exist in Firestore, initialize with defaults
+          await setDoc(settingsDocRef, defaultSettings);
+          setSettings(defaultSettings);
+        }
+      } catch (error) {
+        console.error("Error fetching settings:", error);
+        setSettings(defaultSettings); // Fallback to defaults on error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!authLoading) {
+      if (user) {
+        // If user is logged in, fetch their settings
+        fetchSettings();
+      } else {
+        // If user is not logged in, no need to fetch. Use defaults.
+        setSettings(defaultSettings);
+        setLoading(false);
+      }
+    }
+  }, [user, authLoading]);
+
+
+  // Effect to apply theme CSS variables whenever settings change
+  useEffect(() => {
     const hsl = hexToHsl(settings.primaryColor);
     if (hsl) {
       const root = document.documentElement;
@@ -65,21 +107,29 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       root.style.setProperty('--color-accent-s', `${hsl.s}%`);
       root.style.setProperty('--color-accent-l', `${hsl.l}%`);
     }
+  }, [settings.primaryColor]);
 
-    // Save settings to local storage
-    localStorage.setItem('design-wiki-settings', JSON.stringify(settings));
-
+  const updateSettings = useCallback(async (newSettings: Partial<Settings>) => {
+    const updatedSettings = { ...settings, ...newSettings };
+    setSettings(updatedSettings);
+    try {
+      const settingsDocRef = doc(db, 'settings', 'global');
+      await setDoc(settingsDocRef, newSettings, { merge: true });
+    } catch (error) {
+      console.error("Error updating settings:", error);
+      // Optional: handle error, maybe revert optimistic update
+    }
   }, [settings]);
-
-  const updateSettings = useCallback((newSettings: Partial<Settings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
-  }, []);
   
-  const value = useMemo(() => ({ settings, updateSettings }), [settings, updateSettings]);
+  const value = useMemo(() => ({ settings, loading, updateSettings }), [settings, loading, updateSettings]);
 
   return (
     <SettingsContext.Provider value={value}>
       {children}
     </SettingsContext.Provider>
   );
+};
+
+export const useSettings = () => {
+    return useContext(SettingsContext);
 };
