@@ -51,7 +51,17 @@ const Settings: React.FC = () => {
     }, [settings]);
 
     useEffect(() => {
-        setHasChanges(JSON.stringify(localSettings) !== JSON.stringify(settings));
+        if (!localSettings || !settings) {
+            setHasChanges(false);
+            return;
+        }
+        const changed =
+            localSettings.appName !== settings.appName ||
+            localSettings.logo !== settings.logo ||
+            localSettings.primaryColor !== settings.primaryColor ||
+            localSettings.buttonRadius !== settings.buttonRadius ||
+            localSettings.primaryButtonStyle !== settings.primaryButtonStyle;
+        setHasChanges(changed);
     }, [localSettings, settings]);
 
     const handleUpdate = useCallback((key: keyof Settings, value: any) => {
